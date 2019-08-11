@@ -73,6 +73,8 @@ database.setInfo("DATASOURCEVERSION", "HMDB4.0.20190116-CHEBI" + chebiVersion + 
 database.setInfo("DATATYPE", "Metabolite");
 database.setInfo("SERIES", "standard_metabolite");
 
+
+
 def addXRef(GdbConstruct database, Xref ref, String node, DataSource source, Set genesDone, Set linkesDone) {
    id = node.trim()
    if (id.length() > 0) {
@@ -112,6 +114,18 @@ def cleanKey(String inchikey) {
    String cleanKey = inchikey.trim()
    if (cleanKey.startsWith("InChIKey=")) cleanKey = cleanKey.substring(9)
    cleanKey
+}
+
+def addRDF(GdbConstruct database, String dbName, String key, String value){
+  id = value.trim()
+  if(id.length() > 255){
+    println "Warn: attribute does not fit the Derby SQL schema: $id"
+  }
+  else if(id.length() > 0){
+    if (database.setRDF(dbName, key, value) !=0 ) {
+      println"Error (addRDF): "+ database.recentException.getMessage() 
+    }
+  }
 }
 
 // load the HMDB content
@@ -276,6 +290,13 @@ chebiNames.eachLine { line,number ->
   if (counter % commitInterval == 0) database.commit()
 }
 unitReport << "  <testcase classname=\"ChEBICreation\" name=\"NamesFound\"/>\n"
+    addRDF(database ,(ref.getDataSource).getFullName, "dcterms:title", "Chemical Entities of Biological Interest (ChEBI)@en ;")
+    addRDF(database ,(ref.getDataSource).getFullName, "dcterms:description", "Chemical Entities of Biological Interest (ChEBI) is a freely available dictionary of molecular entities focused on &#39;small&#39; chemical compounds.@en ;")
+    addRDF(database ,(ref.getDataSource).getFullName, "foaf:homepage", "<http://www.ebi.ac.uk/chebi/>")
+    addRDF(database ,(ref.getDataSource).getFullName, "dcterms:publisher", "http://www.ebi.ac.uk")
+    addRDF(database ,(ref.getDataSource).getFullName, "void:dataDump", "<ftp://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi.owl>")
+    addRDF(database ,(ref.getDataSource).getFullName, "dcterms:license", "<http://creativecommons.org/licenses/by-sa/3.0/>")
+
 // load the mappings
 def mappedIDs = new File('data/chebi_database_accession.tsv')
 mappedIDs.eachLine { line,number ->
@@ -327,7 +348,7 @@ new File("cas2wikidata.csv").eachLine { line,number ->
 
   fields = line.split(",")
   rootid = fields[0].substring(31)
-  Xref ref = new Xref(rootid, wikidataDS);
+  Xref ref = new Xref(rootid, wikidataDS, false);
   if (!genesDone.contains(ref.toString())) {
     addError = database.addGene(ref);
     if (addError != 0) println "Error (addGene): " + database.recentException().getMessage()
@@ -410,7 +431,8 @@ new File("kegg2wikidata.csv").eachLine { line,number ->
   counter++
   if (counter % commitInterval == 0) {
     println "Info: errors: " + error + " (KEGG)"
-    database.commit()
+    database.commit()    private PrintStream out;
+
   }
 }
 unitReport << "  <testcase classname=\"WikidataCreation\" name=\"KEGGFound\"/>\n"
